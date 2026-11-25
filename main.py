@@ -12,9 +12,11 @@ OUTPUT = OUTPUT_DIR / "entry.png"
 
 def main() -> None:
     OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
-    os.chmod(OUTPUT_DIR, 0o755)
     shutil.copyfile(SOURCE, OUTPUT)
-    os.chmod(OUTPUT, 0o644)
+    try:
+        os.chmod(OUTPUT, 0o644)
+    except OSError:
+        pass
 
 
 if __name__ == "__main__":

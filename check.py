@@ -1,64 +1,79 @@
-"""Local checks: size, PNG signature, and two identical runs of main.py."""
-
-import hashlib
-import shutil
+"""Offline preflight of this entry's 8-bit, non-interlaced RGB PNG."""
+from hashlib import sha256
+from io import BytesIO
+from pathlib import Path
+import os
 import struct
 import subprocess
+from uuid import uuid4
 import sys
-import tempfile
-from pathlib import Path
-
-ROOT = Path(__file__).resolve().parent
-ENTRY = ROOT / "assets" / "entry.png"
-OUTPUT = Path("/output/entry.png")
-PNG_SIGNATURE = b"\x89PNG\r\n\x1a\n"
-MAX_BYTES = 1024 * 1024
+import zlib
 
 
-def sha256(data):
-    return hashlib.sha256(data).hexdigest()
-
-
-def read_png_size(data):
-    if not data.startswith(PNG_SIGNATURE):
-        raise SystemExit("FAIL: file does not start with a PNG signature")
-    if data[12:16] != b"IHDR":
-        raise SystemExit("FAIL: PNG is missing an IHDR chunk")
-    width, height = struct.unpack(">II", data[16:24])
-    return width, height
-
-
-def run_main(destination):
-    subprocess.run([sys.executable, str(ROOT / "main.py")], check=True, cwd=ROOT)
-    if not OUTPUT.is_file():
-        raise SystemExit("FAIL: main.py did not write /output/entry.png")
-    shutil.copyfile(OUTPUT, destination)
+def inspect(data):
+    assert len(data) <= 1_048_576, "Image exceeds the file-size limit"
+    stream = BytesIO(data)
+    assert stream.read(8) == b"\x89PNG\r\n\x1a\n", "Not PNG"
+    compressed = bytearray()
+    kinds = []
+    while True:
+        length, kind = struct.unpack(">I4s", stream.read(8))
+        payload = stream.read(length)
+        assert len(payload) == length, "Truncated chunk"
+        expected, = struct.unpack(">I", stream.read(4))
+        assert zlib.crc32(kind + payload) == expected, "Invalid chunk checksum"
+        kinds.append(kind)
+        if kind == b"IHDR":
+            assert len(kinds) == 1
+            assert struct.unpack(">IIBBBBB", payload) == (1024, 1024, 8, 2, 0, 0, 0)
+        if kind == b"IDAT":
+            compressed.extend(payload)
+        if kind == b"IEND":
+            assert length == 0 and not stream.read()
+            break
+    assert kinds[0] == b"IHDR" and b"IDAT" in kinds
+    inflater = zlib.decompressobj()
+    pixels = inflater.decompress(compressed) + inflater.flush()
+    assert inflater.eof and not inflater.unused_data and not inflater.unconsumed_tail
+    stride = 1 + 3 * 1024
+    assert len(pixels) == 1024 * stride and max(pixels[::stride]) <= 4
 
 
 def main():
-    data = ENTRY.read_bytes()
-    if len(data) > MAX_BYTES:
-        raise SystemExit(f"FAIL: {len(data)} bytes is over 1 MiB")
-    width, height = read_png_size(data)
-    if (width, height) != (1024, 1024):
-        raise SystemExit(f"FAIL: image is {width}x{height}, expected 1024x1024")
+    if not __debug__:
+        raise SystemExit("Run check.py without -O to enable validation.")
+    root = Path(__file__).resolve().parent
+    master = root / "assets" / "entry.png"
+    original = master.read_bytes()
+    inspect(original)
+    print(f"PASS assets/entry.png: complete 1024 x 1024 RGB PNG, {len(original)} bytes")
 
-    with tempfile.TemporaryDirectory() as temp_name:
-        folder = Path(temp_name)
-        first = folder / "run-1.png"
-        second = folder / "run-2.png"
-        run_main(first)
-        run_main(second)
-        first_hash = sha256(first.read_bytes())
-        second_hash = sha256(second.read_bytes())
+    # With no arguments, exercise the grading program itself. Use fresh,
+    # initially absent output paths, and leave no copies in the source tree.
+    scratch = root / "_review" / uuid4().hex
+    for run in (1, 2):
+        destination = scratch / f"run-{run}"
+        assert not destination.exists()
+        subprocess.run(
+            [sys.executable, "-B", str(root / "main.py")],
+            env={**os.environ, "MAKEFUN_OUTPUT_DIR": str(destination)},
+            check=True,
+        )
+        output = destination / "entry.png"
+        data = output.read_bytes()
+        inspect(data)
+        assert data == original, f"Output from run {run} differs from master"
+        print(f"PASS run {run}: created new output directory; identical PNG")
+        output.unlink()
+        destination.rmdir()
+    scratch.rmdir()
 
-    if first_hash != second_hash:
-        raise SystemExit("FAIL: two runs of main.py wrote different bytes")
-    if first_hash != sha256(data):
-        raise SystemExit("FAIL: /output/entry.png does not match assets/entry.png")
-
-    print("PASS")
-    print(f"{width}x{height}, {len(data)} bytes, sha256 {first_hash}")
+    for filename in sys.argv[1:]:
+        data = Path(filename).read_bytes()
+        inspect(data)
+        assert data == original, f"{filename} differs from master"
+        print(f"PASS {filename}: identical PNG")
+    print("SHA-256:", sha256(original).hexdigest())
 
 
 if __name__ == "__main__":

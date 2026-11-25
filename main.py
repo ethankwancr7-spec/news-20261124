@@ -1,22 +1,15 @@
-"""Copy the committed front page to /output/entry.png. Standard library only."""
-
-import os
-import shutil
+"""Contest entry point (Python 3.13, standard library only)."""
 from pathlib import Path
+import os
+from shutil import copyfile
 
-ROOT = Path(__file__).resolve().parent
-SOURCE = ROOT / "assets" / "entry.png"
-OUTPUT_DIR = Path("/output")
-OUTPUT = OUTPUT_DIR / "entry.png"
+ARTWORK = Path(__file__).resolve().parent / "assets" / "entry.png"
 
 
-def main() -> None:
-    OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
-    shutil.copyfile(SOURCE, OUTPUT)
-    try:
-        os.chmod(OUTPUT, 0o644)
-    except OSError:
-        pass
+def main():
+    destination = Path(os.environ.get("MAKEFUN_OUTPUT_DIR", "/output"))
+    destination.mkdir(parents=True, exist_ok=True)
+    copyfile(ARTWORK, destination / "entry.png")
 
 
 if __name__ == "__main__":

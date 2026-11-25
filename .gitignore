@@ -1,0 +1,7 @@
+__pycache__/
+*.pyc
+_review/
+out/
+output/
+transcripts/
+*.jsonl

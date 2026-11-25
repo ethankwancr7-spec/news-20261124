@@ -5,7 +5,7 @@ from pathlib import Path
 
 from PIL import Image, ImageChops, ImageDraw, ImageFont
 
-from stories import stories_by_tier
+from stories import stories_by_tier, strapline
 
 W = H = 1024
 SCALE = 2
@@ -25,6 +25,8 @@ AMERICAS = (46, 125, 91)
 ASIA = (192, 138, 30)
 BUSINESS = (107, 79, 160)
 RELIGION = (122, 122, 122)
+AFRICA = (138, 90, 43)
+OCEANIA = (31, 138, 138)
 BRIEF_INK = (51, 51, 51)
 STROKE = 3
 
@@ -118,6 +120,14 @@ def fit_text(draw, text, font_path, start, minimum, max_width, max_lines):
 
 def accent_for(region):
     upper = region.upper()
+    if upper.startswith("MARKETS") or upper.startswith("BUSINESS"):
+        return BUSINESS
+    if upper.startswith("AFRICA"):
+        return AFRICA
+    if upper.startswith("OCEANIA"):
+        return OCEANIA
+    if upper.startswith("CULTURE"):
+        return RELIGION
     if "MIDDLE" in upper:
         return MIDDLE_EAST
     if "AMERICAS" in upper:
@@ -291,72 +301,85 @@ def fill_horizontal_split(image, points, split_y, top_color, bottom_color):
     image.paste(bottom, (0, 0), ImageChops.multiply(mask, bottom_band))
 
 
+def draw_label_pill(draw, x, y, text, font):
+    text_w, text_h = text_size(draw, text, font)
+    pad_x, pad_y = 6, 3
+    draw.rounded_rectangle(
+        [px(x), px(y), px(x + text_w + pad_x * 2), px(y + text_h + pad_y * 2)],
+        radius=px(3),
+        fill=INK,
+    )
+    draw_text(draw, x + pad_x, y + pad_y, text, font, PAPER)
+    return text_w + pad_x * 2, text_h + pad_y * 2
+
+
 def draw_lead_map(image, draw):
     polygon(
         draw,
-        [(348, 140), (574, 140), (574, 430), (430, 440), (330, 300), (338, 175)],
+        [(360, 112), (568, 112), (568, 248), (455, 258), (340, 190), (352, 128)],
         RUSSIA_BG,
     )
     polygon(
         draw,
         [
-            (76, 328), (190, 310), (320, 316), (410, 338),
-            (446, 378), (428, 424), (150, 428), (82, 386), (70, 346),
+            (48, 248), (170, 236), (320, 240), (430, 258),
+            (455, 300), (430, 356), (110, 358), (44, 312), (42, 268),
         ],
         EUROPE,
     )
     ukraine = [
-        (100, 236), (124, 198), (190, 176), (300, 164), (410, 170),
-        (470, 188), (498, 214), (506, 242), (494, 266), (470, 280),
-        (400, 288), (372, 290), (368, 298),
-        (378, 306), (366, 316), (354, 306), (364, 298), (360, 290),
-        (280, 288), (190, 286), (130, 278), (104, 258),
+        (64, 168), (82, 140), (160, 124), (300, 118), (430, 124),
+        (488, 142), (504, 172), (492, 198), (450, 210),
+        (410, 216), (392, 216), (386, 228), (376, 240), (366, 228), (360, 216),
+        (250, 216), (150, 214), (78, 200), (60, 182),
     ]
-    split_y = 232
-    fill_horizontal_split(image, ukraine, split_y, FLAG_BLUE, FLAG_YELLOW)
-    polyline(draw, ukraine + [ukraine[0]], PAPER, 1.5)
-    for base in (392, 412):
-        polyline(draw, wave_points(110, 400, base, 2.0), PAPER, 2)
-    ship = (156, 392)
-    draw_sinking_ship(draw, ship[0], ship[1], 1.5)
-    city = (430, 262)
+    fill_horizontal_split(image, ukraine, 168, FLAG_BLUE, FLAG_YELLOW)
+    polyline(draw, ukraine + [ukraine[0]], PAPER, 1.25)
+    for base in (300, 328):
+        polyline(draw, wave_points(90, 400, base, 1.8), PAPER, 2)
+    ship = (155, 305)
+    ship_scale = 0.72
+    draw_sinking_ship(draw, ship[0], ship[1], ship_scale)
+    city = (420, 192)
     arcs = [
-        ((536, 196), (500, 210), (464, 236), city),
-        ((548, 228), (506, 236), (470, 250), (436, 260)),
-        ((534, 258), (496, 264), (464, 266), (434, 266)),
+        ((530, 140), (490, 150), (455, 170), city),
+        ((540, 168), (500, 172), (460, 182), (426, 190)),
+        ((528, 196), (488, 198), (454, 196), (424, 198)),
     ]
     for p0, p1, p2, p3 in arcs:
         curve = bezier(p0, p1, p2, p3)
-        dashed_polyline(draw, curve, FLAG_YELLOW, STROKE, 9, 6)
-        arrow_head(draw, curve[-8], curve[-1], INK, 7)
-    draw.ellipse([px(city[0] - 6), px(city[1] - 6), px(city[0] + 6), px(city[1] + 6)], fill=MIDDLE_EAST)
-    draw.ellipse([px(city[0] - 2.5), px(city[1] - 2.5), px(city[0] + 2.5), px(city[1] + 2.5)], fill=PAPER)
-    label_font = load_font(SANS_BOLD, 15)
+        dashed_polyline(draw, curve, FLAG_YELLOW, 2, 7, 5)
+        arrow_head(draw, curve[-8], curve[-1], INK, 6)
+    draw.ellipse([px(city[0] - 5), px(city[1] - 5), px(city[0] + 5), px(city[1] + 5)], fill=MIDDLE_EAST)
+    draw.ellipse([px(city[0] - 2), px(city[1] - 2), px(city[0] + 2), px(city[1] + 2)], fill=PAPER)
+    label_font = load_font(SANS_BOLD, 13)
     city_label = "Zaporizhzhia"
     city_w, _city_h = text_size(draw, city_label, label_font)
-    draw_text(draw, city[0] - city_w - 8, city[1] - 16, city_label, label_font, INK)
-    draw_tracked(draw, 140, 252, "UKRAINE", label_font, INK, 1.5)
-    draw_tracked(draw, 478, 168, "RUSSIA", label_font, PAPER, 1.5)
-    draw_tracked(draw, 108, 432, "BLACK SEA", label_font, PAPER, 1.1)
-    draw_text(draw, 40, 300, "Russian ship hit", label_font, PAPER)
+    draw_text(draw, city[0] - city_w - 6, city[1] - 14, city_label, label_font, INK)
+    draw_tracked(draw, 96, 178, "UKRAINE", label_font, INK, 1.2)
+    draw_tracked(draw, 470, 128, "RUSSIA", label_font, PAPER, 1.2)
+    draw_tracked(draw, 70, 338, "BLACK SEA", label_font, PAPER, 1.0)
+    hit_font = load_font(SANS_BOLD, 13)
+    smoke_top = ship[1] - 52 * ship_scale
+    draw_label_pill(draw, ship[0] - 36, smoke_top - 22, "Russian ship hit", hit_font)
 
 
 def draw_lead_copy(draw, story):
-    x = 586
-    width = 396
-    top = 140
-    bottom = 454
-    _tag_w, tag_h = text_size(draw, story["region"], load_font(SANS_BOLD, 15))
+    x = 548
+    width = 420
+    top = 116
+    bottom = 362
+    _tag_w, tag_h = text_size(draw, story["tag"], load_font(SANS_BOLD, 15))
     chip_h = tag_h + 8
     head_font, head_lines, head_size = fit_text(
-        draw, story["headline"], SERIF_BOLD, 40, 32, width, 2
+        draw, story["headline"], SERIF_BOLD, 34, 26, width, 2
     )
     head_advance = head_size * 1.12
-    bullets = [part for part in story["deck"].split("\n") if part.strip()]
-    bullet_size = 19
+    bullets = list(story["points"])
+    bullet_size = 17
     wrapped = []
     bullet_advance = 22
-    bullet_gap = 10
+    bullet_gap = 6
     while bullet_size >= 15:
         bullet_font = load_font(SANS, bullet_size)
         wrapped = [wrap_text(draw, bullet, bullet_font, width - 16) for bullet in bullets]
@@ -370,7 +393,7 @@ def draw_lead_copy(draw, story):
         bullet_font = load_font(SANS, 15)
     spare = bottom - top - block_h
     y = top + max(0, spare) * 0.28
-    draw_chip(draw, x, y, story["region"], EUROPE)
+    draw_chip(draw, x, y, story["tag"], EUROPE)
     y += chip_h + 12
     for line in head_lines:
         draw_text(draw, x, y, line, head_font, PAPER)
@@ -390,7 +413,7 @@ def draw_lead_copy(draw, story):
 
 
 def draw_lead(image, draw):
-    draw.rectangle([px(32), px(120), px(992), px(470)], fill=LEAD_BG)
+    draw.rectangle([px(32), px(104), px(992), px(372)], fill=LEAD_BG)
     draw_lead_map(image, draw)
     draw_lead_copy(draw, stories_by_tier("lead")[0])
 
@@ -431,10 +454,11 @@ def icon_hormuz(draw, x, y, w, h):
     draw.rectangle([px(x + 8), px(cy - 24), px(x + 34), px(cy - 6)], fill=INK)
     draw.rectangle([px(x + 14), px(cy - 32), px(x + 24), px(cy - 24)], fill=INK)
     draw.rectangle([px(x + 12), px(cy - 20), px(x + 18), px(cy - 14)], fill=PAPER)
-    label = "HORMUZ"
-    label_font = load_font(SANS_BOLD, 12)
-    label_w, label_h = text_size(draw, label, label_font)
-    draw_text(draw, x + (w - label_w) / 2, cy + 12, label, label_font, INK)
+    if h >= 60:
+        label = "HORMUZ"
+        label_font = load_font(SANS_BOLD, 12)
+        label_w, _label_h = text_size(draw, label, label_font)
+        draw_text(draw, x + (w - label_w) / 2, cy + 12, label, label_font, INK)
 
 
 def icon_gaza(draw, x, y, w, h):
@@ -510,6 +534,83 @@ def draw_second_card(draw, story, x, y, w, h):
         print(f"second card {story['headline']!r} deck ends {deck_top:.1f}, card ends {y + h}")
     else:
         print(f"second {story['icon']} headline {head_size}px, deck {deck_size}px, {len(deck_lines)} lines")
+
+
+def icon_chart_tile(draw, x, y, w, h):
+    inset = 8
+    x0, y0 = x + inset, y + h - inset
+    x1, y1 = x + w - inset, y + inset
+    polyline(draw, [(x0, y1), (x0, y0), (x + w - inset, y0)], INK, 2)
+    polyline(draw, [(x0 + 6, y0 - 10), (x + w * 0.45, y + h * 0.42), (x1 - 4, y1 + 6)], BUSINESS, 3)
+    arrow_head(draw, (x + w * 0.62, y + h * 0.38), (x1 - 4, y1 + 6), BUSINESS, 7)
+
+
+def icon_china_tile(draw, x, y, w, h):
+    roof_y = y + h * 0.42
+    polygon(
+        draw,
+        [(x + w * 0.5, y + 8), (x + w - 8, roof_y), (x + 8, roof_y)],
+        ASIA,
+    )
+    draw.rectangle([px(x + 16), px(roof_y), px(x + w - 16), px(y + h - 10)], outline=INK, width=px(2))
+    draw.rectangle([px(x + w * 0.42), px(y + h * 0.62), px(x + w * 0.58), px(y + h - 10)], fill=INK)
+
+
+def draw_top_tiles(draw):
+    tiles = stories_by_tier("tile")
+    gap = 12
+    top, height = 382, 138
+    width = (W - 2 * MARGIN - gap * (len(tiles) - 1)) / len(tiles)
+    icons = {"hormuz": icon_hormuz, "chart": icon_chart_tile, "china": icon_china_tile}
+    for index, story in enumerate(tiles):
+        x = MARGIN + index * (width + gap)
+        draw.rounded_rectangle(
+            [px(x), px(top), px(x + width), px(top + height)],
+            radius=px(4),
+            outline=RULE,
+            width=px(1),
+        )
+        accent = accent_for(story["tag"])
+        draw.rectangle([px(x + 2), px(top + 2), px(x + 7), px(top + height - 2)], fill=accent)
+        icons[story["icon"]](draw, x + 10, top + 8, 36, 32)
+        _tag_w, tag_h = draw_chip(draw, x + 52, top + 10, story["tag"], accent)
+        text_w = width - 22
+        head_top = top + 46
+        head_font = None
+        head_size = 20
+        placed = []
+        head_bottom = head_top
+        for head_size in (22, 20):
+            head_font = load_font(SERIF_BOLD, head_size)
+            head_lines = wrap_text(draw, story["headline"], head_font, text_w)
+            if len(head_lines) > 2:
+                continue
+            cursor = head_top
+            placed = []
+            for line in head_lines:
+                line_h = max(text_size(draw, line, head_font)[1] + 2, head_size * 1.12)
+                placed.append((line, cursor))
+                cursor += line_h
+            head_bottom = cursor
+            deck_try = load_font(SANS, 15)
+            deck_try_lines = wrap_text(draw, story["deck"], deck_try, text_w)
+            deck_try_h = len(deck_try_lines[:2]) * (text_size(draw, "Ag", deck_try)[1] + 3)
+            if head_bottom + 8 + deck_try_h <= top + height - 6:
+                break
+        for line, line_y in placed:
+            draw_text(draw, x + 12, line_y, line, head_font, INK)
+        deck_y = head_bottom + 8
+        deck_font, deck_lines, deck_size = fit_text(
+            draw, story["deck"], SANS, 15, 13, text_w, 2
+        )
+        for line in deck_lines:
+            line_h = text_size(draw, line, deck_font)[1]
+            draw_text(draw, x + 12, deck_y, line, deck_font, BRIEF_INK)
+            deck_y += line_h + 3
+        print(
+            f"tile {story['icon']} headline {head_size}px/{len(placed)} "
+            f"bottom {head_bottom:.0f} deck {deck_size}px/{len(deck_lines)} end {deck_y:.0f}"
+        )
 
 
 def draw_second_row(draw):
@@ -665,36 +766,40 @@ def draw_ticker(draw):
 
 def draw_masthead(draw):
     title = "THE WORLD IN ONE PAGE"
-    title_size = 54
+    title_size = 44
     title_font = load_font(SERIF_BOLD, title_size)
-    while text_width(draw, title, title_font) > W - 2 * MARGIN and title_size > 40:
+    while text_width(draw, title, title_font) > W - 2 * MARGIN and title_size > 36:
         title_size -= 1
         title_font = load_font(SERIF_BOLD, title_size)
     title_w, _title_h = text_size(draw, title, title_font)
-    draw_text(draw, (W - title_w) / 2, 14, title, title_font, INK)
+    draw_text(draw, (W - title_w) / 2, 8, title, title_font, INK)
 
-    date_font = load_font(SANS_BOLD, 22)
-    tracking = 2.2
-    left, right = "TUESDAY", "24 NOVEMBER 2026"
-    left_w = tracked_width(draw, left, date_font, tracking)
-    right_w = tracked_width(draw, right, date_font, tracking)
-    _dash_gap, dash_w = 14, 18
-    date_w = left_w + _dash_gap + dash_w + _dash_gap + right_w
-    date_x = (W - date_w) / 2
-    date_y = 74
-    draw_tracked(draw, date_x, date_y, left, date_font, INK, tracking)
-    _text_w, text_h = text_size(draw, left, date_font)
-    dash_x = date_x + left_w + _dash_gap
+    date_font = load_font(SANS_BOLD, 16)
+    tracking = 1.4
+    day_left, day_right = "TUESDAY", "24 NOVEMBER 2026"
+    left_w = tracked_width(draw, day_left, date_font, tracking)
+    right_w = tracked_width(draw, day_right, date_font, tracking)
+    dash_gap, dash_w = 10, 14
+    date_w = left_w + dash_gap + dash_w + dash_gap + right_w
+    date_x = MARGIN
+    date_y = 58
+    draw_tracked(draw, date_x, date_y, day_left, date_font, INK, tracking)
+    _text_w, text_h = text_size(draw, day_left, date_font)
+    dash_x = date_x + left_w + dash_gap
     dash_y = date_y + text_h * 0.55
     draw.line(
         [(px(dash_x), px(dash_y)), (px(dash_x + dash_w), px(dash_y))],
         fill=INK,
         width=px(2),
     )
-    draw_tracked(draw, dash_x + dash_w + _dash_gap, date_y, right, date_font, INK, tracking)
+    draw_tracked(draw, dash_x + dash_w + dash_gap, date_y, day_right, date_font, INK, tracking)
+    strap = strapline()
+    strap_w, _strap_h = text_size(draw, strap, date_font)
+    draw_text(draw, W - MARGIN - strap_w, date_y, strap, date_font, INK)
 
-    draw.line([(px(MARGIN), px(104)), (px(W - MARGIN), px(104))], fill=INK, width=px(1))
-    draw.line([(px(MARGIN), px(108)), (px(W - MARGIN), px(108))], fill=INK, width=px(1))
+    draw.line([(px(MARGIN), px(86)), (px(W - MARGIN), px(86))], fill=INK, width=px(1))
+    draw.line([(px(MARGIN), px(90)), (px(W - MARGIN), px(90))], fill=INK, width=px(1))
+    print(f"masthead strap {strap}, title {title_size}px, date block {date_w:.0f}px")
 
 
 def save(image):
@@ -710,14 +815,142 @@ def save(image):
         reduced.save(OUT, "PNG", optimize=True)
 
 
+def block_color(name):
+    return {
+        "EUROPE": EUROPE,
+        "MIDDLE EAST": MIDDLE_EAST,
+        "ASIA": ASIA,
+        "AFRICA": AFRICA,
+        "AMERICAS": AMERICAS,
+        "OCEANIA": OCEANIA,
+        "MARKETS": BUSINESS,
+        "CULTURE & SCIENCE": RELIGION,
+    }[name]
+
+
+def draw_region_item(draw, x, y, width, story, color, size, line_h=None):
+    lead_font = load_font(SANS_BOLD, size)
+    body_font = load_font(SANS, size)
+    bullet_x = x
+    text_x = x + 12
+    text_w = width - 12
+    lead = story["lead"]
+    words = story["text"].split()
+    lead_w = text_width(draw, lead, lead_font)
+    first = ""
+    index = 0
+    while index < len(words):
+        trial = words[index] if not first else first + " " + words[index]
+        gap = text_width(draw, " " + trial, body_font)
+        if lead_w + gap <= text_w:
+            first = trial
+            index += 1
+        else:
+            break
+    draw.ellipse([px(bullet_x), px(y + 4), px(bullet_x + 6), px(y + 10)], fill=color)
+    draw_text(draw, text_x, y, lead, lead_font, BRIEF_INK)
+    if first:
+        draw_text(draw, text_x + lead_w + 4, y, first, body_font, BRIEF_INK)
+    if line_h is None:
+        line_h = size * 1.2
+    lines = 1
+    leftover = False
+    if index < len(words):
+        rest = " ".join(words[index:])
+        wrapped = wrap_text(draw, rest, body_font, text_w)
+        draw_text(draw, text_x, y + line_h, wrapped[0], body_font, BRIEF_INK)
+        lines = 2
+        leftover = len(wrapped) > 1
+    return lines * line_h, leftover
+
+
+def item_line_count(draw, width, story, size):
+    _used, leftover = draw_region_item(draw, -800, -800, width, story, INK, size)
+    return (2 if leftover or _used > size * 1.3 else 1), leftover
+
+
+def draw_region_grid(draw):
+    from stories import BLOCKS, items_in_block
+
+    gap = 12
+    columns = 4
+    block_w = (W - 2 * MARGIN - gap * (columns - 1)) / columns
+    zone_top = 530
+    zone_bottom = 996
+    rows = [BLOCKS[:columns], BLOCKS[columns:]]
+    row_meta = []
+    for names in rows:
+        blocks = []
+        row_lines = 0
+        for name in names:
+            items = items_in_block(name)
+            size = 14
+            counts = []
+            while size > 13:
+                counts = [item_line_count(draw, block_w - 16, item, size) for item in items]
+                if not any(flag for _count, flag in counts):
+                    break
+                size -= 1
+            line_count = sum(count for count, _flag in counts)
+            natural = 30 + line_count * size * 1.2 + max(0, len(items) - 1) * 10
+            blocks.append((name, items, size, line_count, natural))
+            row_lines = max(row_lines, line_count)
+        row_meta.append((blocks, max(block[4] for block in blocks), row_lines))
+    spare = (zone_bottom - zone_top - gap) - sum(row[1] for row in row_meta)
+    y = zone_top
+    for blocks, natural, _row_lines in row_meta:
+        weight = natural / sum(row[1] for row in row_meta)
+        row_h = natural + spare * weight
+        for name, items, size, line_count, _natural in blocks:
+            x = MARGIN + (BLOCKS.index(name) % columns) * (block_w + gap)
+            color = block_color(name)
+            draw.rectangle([px(x), px(y), px(x + block_w), px(y + 24)], fill=color)
+            header_font = load_font(SANS_BOLD, 13)
+            draw_text(draw, x + 8, y + 4, name, header_font, PAPER)
+            count = str(len(items))
+            count_w, _count_h = text_size(draw, count, header_font)
+            draw_text(draw, x + block_w - 8 - count_w, y + 4, count, header_font, PAPER)
+            rules = max(0, len(items) - 1) * 10
+            slack = row_h - 30 - rules
+            line_h = slack / line_count if line_count else size * 1.2
+            cursor = y + 30
+            for item_index, item in enumerate(items):
+                used, leftover = draw_region_item(
+                    draw, x + 8, cursor, block_w - 16, item, color, size, line_h
+                )
+                cursor += used
+                if leftover:
+                    print(f"grid clipped {name}: {item['lead']}")
+                if item_index < len(items) - 1:
+                    cursor += 3
+                    draw.line(
+                        [(px(x + 8), px(cursor)), (px(x + block_w - 8), px(cursor))],
+                        fill=RULE,
+                        width=px(1),
+                    )
+                    cursor += 5
+            print(f"grid {name} {len(items)} items at {size}px, row {row_h:.0f}px, line {line_h:.1f}px")
+        y += row_h + gap
+
+
+def draw_footer(draw):
+    font = load_font(SANS, 12)
+    line = "Sources: AP, Reuters, AFP, Al Jazeera, BBC, ABC Australia · all stories dated Tue 24 Nov 2026 (UTC)"
+    width = text_width(draw, line, font)
+    if width > W - 2 * MARGIN:
+        font = load_font(SANS, 11)
+        width = text_width(draw, line, font)
+    draw_text(draw, (W - width) / 2, 1004, line, font, MUTED)
+
+
 def main():
     image = Image.new("RGB", (px(W), px(H)), PAPER)
     draw = ImageDraw.Draw(image)
     draw_masthead(draw)
     draw_lead(image, draw)
-    draw_second_row(draw)
-    draw_briefs(draw)
-    draw_ticker(draw)
+    draw_top_tiles(draw)
+    draw_region_grid(draw)
+    draw_footer(draw)
     save(image)
     print(f"wrote {OUT} ({OUT.stat().st_size} bytes)")
 

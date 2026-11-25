@@ -3,8 +3,10 @@ from hashlib import sha256
 from io import BytesIO
 from pathlib import Path
 import os
+import shutil
 import struct
 import subprocess
+import tempfile
 from uuid import uuid4
 import sys
 import zlib
@@ -48,25 +50,25 @@ def main():
     inspect(original)
     print(f"PASS assets/entry.png: complete 1024 x 1024 RGB PNG, {len(original)} bytes")
 
-    # With no arguments, exercise the grading program itself. Use fresh,
-    # initially absent output paths, and leave no copies in the source tree.
-    scratch = root / "_review" / uuid4().hex
-    for run in (1, 2):
-        destination = scratch / f"run-{run}"
-        assert not destination.exists()
-        subprocess.run(
-            [sys.executable, "-B", str(root / "main.py")],
-            env={**os.environ, "MAKEFUN_OUTPUT_DIR": str(destination)},
-            check=True,
-        )
-        output = destination / "entry.png"
-        data = output.read_bytes()
-        inspect(data)
-        assert data == original, f"Output from run {run} differs from master"
-        print(f"PASS run {run}: created new output directory; identical PNG")
-        output.unlink()
-        destination.rmdir()
-    scratch.rmdir()
+    # Keep all writes outside the checkout. Create a private directory on
+    # POSIX; on Windows inherit the per-user temp directory's access rules.
+    scratch = Path(tempfile.gettempdir()) / f"day-atlas-check-{uuid4().hex}"
+    scratch.mkdir(mode=0o777 if os.name == "nt" else 0o700)
+    try:
+        for run in (1, 2):
+            destination = scratch / f"run-{run}"
+            assert not destination.exists()
+            subprocess.run(
+                [sys.executable, "-B", str(root / "main.py")],
+                env={**os.environ, "MAKEFUN_OUTPUT_DIR": str(destination)},
+                check=True,
+            )
+            data = (destination / "entry.png").read_bytes()
+            inspect(data)
+            assert data == original, f"Output from run {run} differs from master"
+            print(f"PASS run {run}: created new output directory; identical PNG")
+    finally:
+        shutil.rmtree(scratch)
 
     for filename in sys.argv[1:]:
         data = Path(filename).read_bytes()
